@@ -1,0 +1,12 @@
+target/
+**/*.rs.bak
+.env
+.env.local
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.log
+*.tmp

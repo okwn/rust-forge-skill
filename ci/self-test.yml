@@ -1,0 +1,155 @@
+name: Self-Test Skill Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Scenario to run (01-scaffold-cli, 02-scaffold-axum-api, 03-refactor-bad-library, 04-audit-unsafe-ffi, 05-create-workspace-service, or "all")'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - 01-scaffold-cli
+          - 02-scaffold-axum-api
+          - 03-refactor-bad-library
+          - 04-audit-unsafe-ffi
+          - 05-create-workspace-service
+  push:
+    branches: [main]
+    paths:
+      - 'self-tests/**'
+      - 'SKILL.md'
+      - 'guides/**'
+      - 'templates/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-scenario:
+    if: inputs.scenario != 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          version: 1.85.0
+
+      - name: Read scenario
+        run: |
+          cat self-tests/scenarios/${{ inputs.scenario }}.md
+
+      - name: Read expected report shape
+        run: |
+          cat self-tests/expected-reports/${{ inputs.scenario }}-report-shape.md
+
+      - name: Simulate agent run (placeholder)
+        run: |
+          echo "::notice::In CI, this would invoke an AI agent with the scenario"
+          echo "::notice::For now, this validates the scenario files exist and are well-formed"
+
+      - name: Validate scenario exists
+        run: |
+          test -f self-tests/scenarios/${{ inputs.scenario }}.md || exit 1
+          test -f self-tests/expected-reports/${{ inputs.scenario }}-report-shape.md || exit 1
+          echo "✓ Scenario and expected report shape files exist"
+
+      - name: Validate report shape structure
+        run: |
+          shape=self-tests/expected-reports/${{ inputs.scenario }}-report-shape.md
+          grep -q "## Summary" "$shape" || { echo "Missing Summary section"; exit 1; }
+          grep -q "## Files Changed" "$shape" || { echo "Missing Files Changed section"; exit 1; }
+          grep -q "## Commands Run" "$shape" || { echo "Missing Commands Run section"; exit 1; }
+          grep -q "## Risks" "$shape" || { echo "Missing Risks section"; exit 1; }
+          grep -q "## Next Steps" "$shape" || { echo "Missing Next Steps section"; exit 1; }
+          grep -q "## Final Verdict" "$shape" || { echo "Missing Final Verdict section"; exit 1; }
+          echo "✓ Report shape has all 6 required sections"
+
+  validate-all:
+    if: inputs.scenario == 'all'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scenario:
+          - 01-scaffold-cli
+          - 02-scaffold-axum-api
+          - 03-refactor-bad-library
+          - 04-audit-unsafe-ffi
+          - 05-create-workspace-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate scenario ${{ matrix.scenario }}
+        run: |
+          shape=self-tests/expected-reports/${{ matrix.scenario }}-report-shape.md
+          scenario=self-tests/scenarios/${{ matrix.scenario }}.md
+
+          echo "=== Checking ${{ matrix.scenario }} ==="
+
+          # Check files exist
+          test -f "$scenario" || { echo "Missing $scenario"; exit 1; }
+          test -f "$shape" || { echo "Missing $shape"; exit 1; }
+          echo "✓ Files exist"
+
+          # Check required sections in expected shape
+          for section in "Summary" "Files Changed" "Commands Run" "Risks" "Next Steps" "Final Verdict"; do
+            grep -q "## $section" "$shape" || { echo "Missing ## $section in expected shape"; exit 1; }
+          done
+          echo "✓ All required sections present in expected shape"
+
+          # Check scenario has required instructions
+          grep -q "SKILL.md" "$scenario" || { echo "Missing SKILL.md reference in scenario"; exit 1; }
+          grep -q "cargo build" "$scenario" || { echo "Missing cargo build in scenario"; exit 1; }
+          grep -q "report.md" "$scenario" || { echo "Missing report.md output in scenario"; exit 1; }
+          echo "✓ Scenario contains required instructions"
+
+  structure-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate directory structure
+        run: |
+          echo "=== Validating self-tests directory structure ==="
+
+          test -d self-tests/scenarios || { echo "Missing self-tests/scenarios/"; exit 1; }
+          test -d self-tests/expected-reports || { echo "Missing self-tests/expected-reports/"; exit 1; }
+          test -f self-tests/README.md || { echo "Missing self-tests/README.md"; exit 1; }
+          echo "✓ Directory structure valid"
+
+          expected_scenarios=(
+            "01-scaffold-cli"
+            "02-scaffold-axum-api"
+            "03-refactor-bad-library"
+            "04-audit-unsafe-ffi"
+            "05-create-workspace-service"
+          )
+
+          for s in "${expected_scenarios[@]}"; do
+            test -f self-tests/scenarios/${s}.md || { echo "Missing scenarios/${s}.md"; exit 1; }
+            test -f self-tests/expected-reports/${s}-report-shape.md || { echo "Missing expected-reports/${s}-report-shape.md"; exit 1; }
+          done
+          echo "✓ All 5 scenarios and expected reports present"
+
+      - name: Validate README references
+        run: |
+          grep -q "self-tests" README.md || { echo "README.md missing self-tests reference"; exit 1; }
+          grep -q "self-tests" SKILL.md || { echo "SKILL.md missing self-tests reference"; exit 1; }
+          grep -q "SELF_TEST_PLAN" reports/SELF_TEST_PLAN.md || { echo "reports/SELF_TEST_PLAN.md missing"; exit 1; }
+          echo "✓ Cross-references valid"
+
+      - name: Validate Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          version: 1.85.0
+
+      - name: Check cargo available
+        run: |
+          cargo --version
+          cargo fmt --version

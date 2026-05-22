@@ -1,0 +1,23 @@
+# Rust
+target/
+Cargo.lock
+Cargo.toml.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build
+*.rlib
+*.so
+*.dylib
+*.pdb
+
+# Doc
+/doc/
+
+# Test
+/coverage/
+*.profraw

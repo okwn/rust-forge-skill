@@ -1,0 +1,189 @@
+# GitHub Actions CI Workflow for Rust Projects
+# Copy this file to: .github/workflows/rust.yml
+#
+# Quality gates enforced:
+#   - cargo fmt check
+#   - cargo clippy with -D warnings (all lints as errors)
+#   - cargo test (workspace, all features)
+#   - cargo nextest (if available in environment)
+#   - cargo doc (on push only)
+#   - MSRV check (on push to main)
+
+name: Rust CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ─── Stage 1: Formatting ────────────────────────────────────────────────
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain with rustfmt
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
+
+  # ─── Stage 2: Linting ────────────────────────────────────────────────────
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain with clippy
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      # Deny all warnings as errors — zero-tolerance policy
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  # ─── Stage 3: Testing ───────────────────────────────────────────────────
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run test suite
+        run: cargo test --workspace --all-features -- --nocapture
+
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push' && github.repository_owner != ''
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ─── Stage 4: Nextest (optional — runs if nextest is installed) ─────────
+
+  nextest:
+    name: Nextest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Try to install cargo-nextest
+        run: |
+          if cargo install cargo-nextest 2>/dev/null; then
+            echo "NEXTEST_INSTALLED=true" >> $GITHUB_ENV
+          else
+            echo "NEXTEST_INSTALLED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Run tests with nextest
+        if: env.NEXTEST_INSTALLED == 'true'
+        run: cargo nextest run --workspace --all-features --no-fail-fast
+
+  # ─── Stage 5: Documentation ───────────────────────────────────────────
+
+  doc:
+    name: Documentation
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Build documentation
+        run: cargo doc --workspace --all-features --no-deps
+
+  # ─── Stage 6: MSRV Enforcement ────────────────────────────────────────
+
+  msrv:
+    name: MSRV Check
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.85.0
+
+      - name: Check MSRV compatibility
+        run: |
+          cargo check --workspace --all-features
+          cargo build --workspace --all-features
+          cargo test --workspace --all-features
+
+  # ─── Stage 7: Benchmarks (push only, not PRs) ──────────────────────────
+
+  benches:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Run benchmarks
+        run: cargo bench
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-report
+          path: target/criterion/
+          retention-days: 7

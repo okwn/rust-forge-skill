@@ -1,0 +1,5 @@
+msrv = "1.85"
+cognitive_complexity = 15
+
+[lint]
+unsafe = "deny"

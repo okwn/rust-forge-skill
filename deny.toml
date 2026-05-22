@@ -1,0 +1,72 @@
+# deny.toml — cargo-deny configuration for rust-forge-skill projects
+# Copy to your repository root and customise per-project.
+#
+# cargo-deny checks this file automatically when run.
+# Run: cargo deny check advisories licenses ban
+
+[metadata]
+# Human-readable section headers (not enforced)
+
+# ─── Advisories ────────────────────────────────────────────────────────────────
+[advisories]
+db = { registry = "crates-io" }
+vulnerability = "deny"
+unmaintained = "warn"
+notice = "warn"
+# Yanked crates are a warning by default; change to "deny" for stricter projects
+yanked = "warn"
+
+# ─── Licenses ─────────────────────────────────────────────────────────────────
+[licenses]
+unlicensed = "deny"
+# Use "and" for projects requiring all licenses to be compatible
+# Use "or"  for projects accepting any valid license
+# Use "and" + [[licenses.clarify]] for specific exceptions
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CC-BY-4.0",
+    "ISC",
+    "木兰-2.0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "Zlib",
+]
+exceptions = []
+
+# ─── Banned Crates ─────────────────────────────────────────────────────────────
+# Add crates that should never appear in the dependency tree.
+# Examples: old versions with CVEs, crates that are unmaintained with no replacement.
+[ban]
+# allow = []        # Default: all non-explicitly-banned crates are allowed.
+skip = [
+    # Per-attribute filters — skips if the crate matches ALL of the given attributes.
+    # Example: skip = [{ crate = "openssl", version = "<0.10.2" }]
+    # To skip all versions: skip = [{ crate = "bad-crate" }]
+]
+skip_tree = [
+    # Skip the entire dependency tree below a crate.
+    # Use when a transitive dependency is banned but replacing it is non-trivial.
+    # Example: { crate = "bad-transitive", version = "=1.0.0" }
+]
+
+# ─── Sources ──────────────────────────────────────────────────────────────────
+[sources]
+# Forbid dependencies from outside the canonical crates.io index.
+unknown-git = "deny"
+unknown-registry = "deny"
+# Allow crates.io and the sparse protocol (default)
+allow_regions = []
+allow_orgs = []
+
+# ─── Configuration Notes ──────────────────────────────────────────────────────
+# 1. Copy this file to YOUR repository root
+# 2. Edit the [licenses.allow] list to match your project's license policy
+# 3. Add crates to [ban.skip] if you need to tolerate a transitive dependency temporarily
+# 4. Run: cargo deny check advisories licenses ban
+# 5. CI will fail if any ban/advisory/license issue is found at "deny" level

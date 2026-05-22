@@ -1,0 +1,122 @@
+{
+  "$schema": "https://raw.githubusercontent.com/your-org/rust-forge-skill/main/mcp/manifest.schema.json",
+  "name": "rust-forge-skill",
+  "version": "1.0.0",
+  "description": "Production-grade Rust project scaffolding, validation, and refactoring for AI coding agents. Enforces idiomatic Rust patterns, layered architecture, thiserror/anyhow error models, and zero-tolerance quality gates.",
+  "entrypoint": "SKILL.md",
+  "license": "MIT OR Apache-2.0",
+  "msrv": "1.85.0",
+  "edition": "2024",
+
+  "guides": [
+    { "file": "guides/00-agent-operating-model.md",        "purpose": "Agent contract and operating principles" },
+    { "file": "guides/01-project-architecture.md",         "purpose": "Layer architecture, module design, dependency rules" },
+    { "file": "guides/02-crate-workspace-patterns.md",      "purpose": "Workspace setup, inter-crate dependencies" },
+    { "file": "guides/03-error-handling-anyhow-thiserror.md", "purpose": "thiserror for libraries, anyhow for applications" },
+    { "file": "guides/04-async-tokio-axum.md",             "purpose": "Async runtime, Axum handlers, graceful shutdown" },
+    { "file": "guides/05-cli-clap-tracing.md",             "purpose": "CLI argument parsing, clap, tracing setup" },
+    { "file": "guides/06-testing-bench-fuzz.md",           "purpose": "Unit, integration, bench, fuzz testing" },
+    { "file": "guides/07-ffi-c-cpp.md",                    "purpose": "FFI boundaries, bindgen, unsafe invariants" },
+    { "file": "guides/08-security-unsafe-audit.md",         "purpose": "Security auditing, SAFETY comments, invariants" },
+    { "file": "guides/09-wasm-module-patterns.md",         "purpose": "WASM target, wasm-bindgen, web-sys" },
+    { "file": "guides/10-release-ci-msrv.md",              "purpose": "Release pipeline, CI setup, MSRV policy" },
+    { "file": "guides/11-performance-profiling.md",        "purpose": "Benchmarks, flamegraph, cache optimization" },
+    { "file": "guides/12-rust-anti-patterns.md",           "purpose": "Forbidden patterns, code smells, zero-tolerance rules" }
+  ],
+
+  "templates": [
+    { "name": "cli-app",         "path": "templates/cli-app/",          "purpose": "CLI tool with clap + tracing" },
+    { "name": "axum-api",        "path": "templates/axum-api/",         "purpose": "REST API with Axum + sqlx" },
+    { "name": "library-crate",   "path": "templates/library-crate/",    "purpose": "Publishable library with thiserror" },
+    { "name": "ffi-wrapper",      "path": "templates/ffi-wrapper/",       "purpose": "C FFI with bindgen" },
+    { "name": "wasm-module",     "path": "templates/wasm-module/",      "purpose": "WebAssembly with wasm-bindgen" },
+    { "name": "workspace-service","path": "templates/workspace-service/","purpose": "Multi-crate workspace" }
+  ],
+
+  "scripts": [
+    { "name": "validate_rust_project.sh", "path": "scripts/validate_rust_project.sh", "purpose": "Full quality gate: fmt, clippy, test, audit, deny" },
+    { "name": "generate_cargo_workspace.sh","path": "scripts/generate_cargo_workspace.sh","purpose": "Scaffold a multi-crate Cargo workspace" },
+    { "name": "audit_unsafe.sh",          "path": "scripts/audit_unsafe.sh",          "purpose": "Find unsafe blocks, verify SAFETY comments" },
+    { "name": "check_msrv.sh",            "path": "scripts/check_msrv.sh",            "purpose": "Verify MSRV declared in Cargo.toml matches reality" }
+  ],
+
+  "capabilities": [
+    {
+      "id": "rust_project_scaffold",
+      "description": "Scaffold a new Rust project from a template. Supports CLI, REST API, library, FFI, WASM, and workspace types.",
+      "templates": ["cli-app", "axum-api", "library-crate", "ffi-wrapper", "wasm-module", "workspace-service"],
+      "required_inputs": ["project_path", "project_type", "project_name"],
+      "optional_inputs": ["msrv", "edition", "async_runtime"],
+      "outputs": ["project_structure", "validation_output"]
+    },
+    {
+      "id": "rust_project_audit",
+      "description": "Audit an existing Rust project against rust-forge-skill quality standards. Checks anti-patterns, errors, async, deps, tests, unsafe.",
+      "required_inputs": ["project_path"],
+      "optional_inputs": ["audit_scope"],
+      "outputs": ["audit_report", "issues_table", "validation_output"]
+    },
+    {
+      "id": "rust_error_refactor",
+      "description": "Refactor a Rust library or application to use idiomatic error handling: thiserror for domain, anyhow for application boundary.",
+      "required_inputs": ["project_path", "project_type"],
+      "optional_inputs": ["msrv"],
+      "outputs": ["refactored_code", "audit_table", "validation_output"]
+    },
+    {
+      "id": "rust_async_service",
+      "description": "Scaffold or audit an async Rust service using Axum + Tokio with proper layered architecture.",
+      "templates": ["axum-api"],
+      "required_inputs": ["project_path", "project_type"],
+      "optional_inputs": ["database", "async_runtime"],
+      "outputs": ["project_structure", "validation_output"]
+    },
+    {
+      "id": "rust_ffi_audit",
+      "description": "Audit unsafe code and FFI boundaries in a Rust FFI or WASM project.",
+      "templates": ["ffi-wrapper", "wasm-module"],
+      "required_inputs": ["project_path"],
+      "optional_inputs": [],
+      "outputs": ["unsafe_audit_report", "issues_table", "validation_output"]
+    },
+    {
+      "id": "rust_security_validation",
+      "description": "Run a full security validation: cargo audit, cargo deny, unsafe audit, and dependency review.",
+      "required_inputs": ["project_path"],
+      "optional_inputs": [],
+      "outputs": ["security_report", "validation_output"]
+    }
+  ],
+
+  "validation_commands": {
+    "format":        { "command": "cargo fmt --all -- --check",                                   "must_pass": true  },
+    "lint":          { "command": "cargo clippy --workspace --all-targets --all-features -- -D warnings", "must_pass": true  },
+    "test":          { "command": "cargo test --workspace --all-features",                       "must_pass": true  },
+    "doc":           { "command": "cargo doc --workspace --all-features --no-deps",               "must_pass": true, "applies_to": "library" },
+    "msrv":          { "command": "./scripts/check_msrv.sh",                                     "must_pass": true, "applies_to": "library" },
+    "unsafe_audit": { "command": "bash ./scripts/audit_unsafe.sh",                             "must_pass": true, "applies_to": "ffi wasm" },
+    "audit":         { "command": "cargo audit",                                                 "must_pass": true, "applies_to": "security" },
+    "deny":          { "command": "cargo deny check advisories licenses ban",                    "must_pass": true, "applies_to": "security" }
+  },
+
+  "expected_outputs": {
+    "summary":        "3–5 sentence description of what was done",
+    "files_changed":  "Table: path, change type, why changed",
+    "commands_run":   "List of validation commands with their output",
+    "risks":          "List of known risks or areas with limited coverage",
+    "next_steps":     "Actionable next steps for the user or next agent",
+    "verdict":        "READY | READY_WITH_LIMITATIONS | NOT_READY"
+  },
+
+  "safety_invariants": [
+    { "rule": "no_destructive_rewrite",      "description": "Agents must not delete or overwrite files outside the target project directory without explicit user permission" },
+    { "rule": "no_unsafe_without_audit",      "description": "No unsafe block may be introduced without a SAFETY comment explaining invariant, why holds, and UB consequences" },
+    { "rule": "no_dependency_bloat",          "description": "Agents must not add dependencies without confirming they are necessary and non-transitive" },
+    { "rule": "no_secret_exposure",           "description": "No API keys, tokens, or passwords may appear in logs, stdout, or source code" },
+    { "rule": "no_unwitnessed_test_passing",  "description": "Agents must run all validation commands and report actual output; no simulated or truncated test results" },
+    { "rule": "no_unvalidated_deploy",         "description": "Agents must not declare a project \"ready\" without running the full quality gate" }
+  ],
+
+  "agent_contract_version": "1.0",
+  "protocol": "rust-forge-skill-v1"
+}

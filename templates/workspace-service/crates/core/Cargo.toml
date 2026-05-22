@@ -1,0 +1,16 @@
+[package]
+name = "{{workspace_name}}-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lib]
+crate-type = ["rlib"]

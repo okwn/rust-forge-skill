@@ -1,0 +1,97 @@
+# dependabot.yml — Automated dependency updates for Rust projects
+# Copy this file to: .github/dependabot.yml
+#
+# Dependabot will:
+#   - Open PRs when Rust dependencies are outdated
+#   - Open PRs when GitHub Actions workflows are outdated
+#   - Open PRs when Docker base images are outdated (if Dockerfiles exist)
+#
+# Schedule: weekly on Monday at 06:00 UTC. Adjust with `schedule.interval`.
+# For critical security patches, set `open-pull-requests-limit: 1` and
+# use a daily schedule instead.
+
+version: 2
+updates:
+  # ─── Rust Dependencies ──────────────────────────────────────────────────────
+  - package-ecosystem: "cargo"
+    directory: "/"         # Looks for Cargo.toml at repo root
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3   # Max concurrent PRs; reduce if you get too many
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+    ignore:
+      # Ignore minor/major MSRV bumps unless explicitly requested.
+      # Patch updates are always included.
+      - dependency-name: "rust-version"
+      # Ignore dev-only or build-only crates you don't want auto-updated
+      # (uncomment and edit as needed):
+      # - dependency-name: "cxxbridge"
+      #   update-types: ["version-update:semver-major"]
+    # Keep cargo-audit PRs separate from regular cargo updates
+    groups:
+      rust-dependencies:
+        dependency-type: "direct:production"
+        update-types:
+          - "version-update:semver-patch"
+          - "version-update:semver-minor"
+      dev-dependencies:
+        dependency-type: "direct:development"
+        update-types:
+          - "version-update:semver-patch"
+          - "version-update:semver-minor"
+
+  # ─── GitHub Actions ───────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"         # Looks for .github/workflows/*.yml at repo root
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "ci"
+      - "github-actions"
+    ignore:
+      # Ignore actions that must stay on specific major versions
+      # (uncomment and edit as needed):
+      # - dependency-name: "actions/checkout"
+      #   update-types: ["version-update:semver-major"]
+
+  # ─── Docker ────────────────────────────────────────────────────────────────────
+  # Enable if your project has a Dockerfile.
+  # Uncomment the section below if you use Docker:
+  #
+  # - package-ecosystem: "docker"
+  #   directory: "/"         # Looks for Dockerfile at repo root
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "monday"
+  #     time: "06:00"
+  #     timezone: "UTC"
+  #   open-pull-requests-limit: 2
+  #   commit-message:
+  #     prefix: "docker"
+  #     include: "scope"
+  #   labels:
+  #     - "docker"
+  #     - "dependencies"
+
+# ─── Configuration Notes ──────────────────────────────────────────────────────
+# 1. Copy this file to: .github/dependabot.yml
+# 2. Edit the `ignore` section to suit your project
+# 3. Enable Docker section if you have Dockerfiles
+# 4. Dependabot opens PRs automatically — CI must still pass
+# 5. For cargo, regular updates are fine; for critical security patches,
+#    rely on the `cargo audit` job in rust-security.yml instead

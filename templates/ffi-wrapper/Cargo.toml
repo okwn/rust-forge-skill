@@ -1,0 +1,30 @@
+[package]
+name = "{{crate_name}}"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Rust FFI wrapper for {{description}}"
+authors = ["{{author}}"]
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "{{crate_name}}"
+crate-type = ["staticlib", "cdylib"]
+
+[build-dependencies]
+bindgen = "0.69"
+cc = "1.0"
+
+[dependencies]
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+static_assertions = "1.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+opt-level = 3

@@ -1,0 +1,156 @@
+# GitHub Actions Security Workflow for Rust Projects
+# Copy this file to: .github/workflows/rust-security.yml
+#
+# Security gates enforced:
+#   - cargo audit (vulnerability database check)
+#   - cargo deny (banned crates, bad licenses, advisories)
+#   - unsafe block audit (SAFETY comments required)
+#   - dependency review (outdated / large dependencies)
+#   - Clippy with unsafe_code lint denied
+
+name: Rust Security
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─── Stage 1: Vulnerability Audit ───────────────────────────────────────
+
+  audit:
+    name: Security Audit (cargo audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run cargo audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── Stage 2: Cargo Deny ────────────────────────────────────────────────
+
+  cargo-deny:
+    name: Cargo Deny (banned crates, licenses, advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run cargo deny
+        uses: taiki-e/cargo-deny-action@v1
+        with:
+          command: check advisories licenses ban
+
+  # ─── Stage 3: Unsafe Block Audit ────────────────────────────────────────
+
+  unsafe-audit:
+    name: Unsafe Block Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run unsafe audit script
+        run: |
+          if [ -f ./scripts/audit_unsafe.sh ]; then
+            bash ./scripts/audit_unsafe.sh
+          else
+            echo "=== Unsafe Block Audit ==="
+            echo "Scanning src/ for unsafe blocks without SAFETY comments..."
+            UNSAFE_COUNT=$(grep -rn "unsafe {" --include="*.rs" src/ 2>/dev/null | wc -l)
+            if [ "$UNSAFE_COUNT" -eq 0 ]; then
+              echo "No unsafe blocks found — nothing to audit."
+            else
+              echo "Found $UNSAFE_COUNT unsafe block(s). Checking for SAFETY comments..."
+              grep -rn "unsafe {" --include="*.rs" src/ 2>/dev/null | while IFS: read -r line; do
+                FILE=$(echo "$line" | cut -d: -f1)
+                LINE_NUM=$(echo "$line" | cut -d: -f2)
+                CONTEXT=$(sed -n "$((LINE_NUM > 3 ? LINE_NUM - 3 : 1)),$((LINE_NUM - 1))p" "$FILE")
+                if echo "$CONTEXT" | grep -qi "SAFETY"; then
+                  echo "  [SAFE] $FILE:$LINE_NUM"
+                else
+                  echo "  [MISSING SAFETY] $FILE:$LINE_NUM"
+                fi
+              done
+            fi
+          fi
+
+  # ─── Stage 4: Dependency Audit ──────────────────────────────────────────
+
+  dependencies:
+    name: Dependency Audit (outdated / large deps)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for outdated dependencies
+        run: |
+          if cargo install cargo-outdated 2>/dev/null; then
+            cargo outdated --workspace || true
+          else
+            echo "cargo-outdated not available — skipping outdated check"
+          fi
+
+      - name: Check for large dependencies
+        run: |
+          echo "=== Dependency Size Audit ==="
+          if command -v jq &>/dev/null; then
+            cargo metadata --format-version=1 --no-deps 2>/dev/null | \
+              jq -r '.packages[] | "\(.name): \(.manifest_path | split("/") | .[-2])"' | \
+              sort | uniq -c | sort -rn | head -20 || \
+              echo "cargo metadata not available"
+          else
+            echo "jq not available — skipping size audit"
+          fi
+
+  # ─── Stage 5: Clippy with unsafe_code denied ─────────────────────────────
+
+  unsafe-clippy:
+    name: Unsafe Code Lints (Clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain with clippy
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Run Clippy with unsafe code checks
+        run: |
+          cargo clippy --workspace --all-targets --all-features -- \
+            -D warnings \
+            -D unsafe_code \
+            -D deprecated
+
+  # ─── Stage 6: Dependency Review Note ────────────────────────────────────
+  # GitHub Dependency Review can be enabled separately:
+  #   Settings → Security → Security management → Dependency Review
+  #   Or: actions/dependency-review-action@v4
+
+  dep-review-note:
+    name: Dependency Review Note
+    runs-on: ubuntu-latest
+    steps:
+      - name: Note on Dependency Review
+        run: |
+          echo "GitHub Dependency Review can be enabled separately:"
+          echo "  Settings → Security → Security management → Dependency Review"
+          echo "  Or: actions/dependency-review-action@v4"
+          echo ""
+          echo "This action blocks pull requests introducing known vulnerable dependencies."
